@@ -2,6 +2,7 @@
 # Prepare an Azure provider account for CycleCloud usage.
 from ast import arguments
 import os
+from sched import scheduler
 import sys
 import argparse
 import json
@@ -506,9 +507,11 @@ def import_cluster(vm_metadata, osOfClusterNodes):
 
     schedulerImage_param = "SchedulerImageName=" + osOfClusterNodes
     workerImage_param = "HPCImageName=" + osOfClusterNodes
+
+    override_params = subnet_param + " " + schedulerImage_param + " " + workerImage_param
     
     # We import the cluster, passing the subnet name as a parameter override
-    _catch_sys_error(["/usr/local/bin/cyclecloud","import_cluster","-f", cluster_template_file_download_path, "-p", cluster_parameters_file_download_path, "--parameter-override", schedulerImage_param])
+    _catch_sys_error(["/usr/local/bin/cyclecloud","import_cluster","-f", cluster_template_file_download_path, "-p", cluster_parameters_file_download_path, "--parameter-override", override_params])
 
 
 def start_cluster():
