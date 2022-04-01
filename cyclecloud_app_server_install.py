@@ -508,7 +508,7 @@ def import_cluster(vm_metadata, osOfClusterNodes):
     workerImage_param = "HPCImageName=" + osOfClusterNodes
     
     # We import the cluster, passing the subnet name as a parameter override
-    _catch_sys_error(["/usr/local/bin/cyclecloud","import_cluster","-f", cluster_template_file_download_path, "-p", cluster_parameters_file_download_path, "--parameter-override", subnet_param, "--parameter-override", schedulerImage_param, "--parameter-override", workerImage_param])
+    _catch_sys_error(["/usr/local/bin/cyclecloud","import_cluster","-f", cluster_template_file_download_path, "-p", cluster_parameters_file_download_path, "--parameter-override", schedulerImage_param])
 
 
 def start_cluster():
