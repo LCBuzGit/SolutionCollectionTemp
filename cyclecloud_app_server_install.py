@@ -448,7 +448,7 @@ def configure_msft_apt_repos():
     
     # Fix while Ubuntu 20 is not available -- we install the Ubuntu 18.04 version
     lsb_release = "bionic"
-
+    _catch_sys_error(["apt", "update"])
     with open('/etc/apt/sources.list.d/azure-cli.list', 'w') as f:
         f.write("deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ {} main".format(lsb_release))
 
