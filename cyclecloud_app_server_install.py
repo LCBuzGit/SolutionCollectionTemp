@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # Prepare an Azure provider account for CycleCloud usage.
+from ast import arguments
 import os
+from sched import scheduler
 import sys
 import argparse
 import json
@@ -447,13 +449,12 @@ def configure_msft_apt_repos():
     
     # Fix while Ubuntu 20 is not available -- we install the Ubuntu 18.04 version
     lsb_release = "bionic"
-
+    _catch_sys_error(["apt", "update"])
     with open('/etc/apt/sources.list.d/azure-cli.list', 'w') as f:
         f.write("deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ {} main".format(lsb_release))
 
     with open('/etc/apt/sources.list.d/cyclecloud.list', 'w') as f:
         f.write("deb [arch=amd64] https://packages.microsoft.com/repos/cyclecloud {} main".format(lsb_release))
-    #_catch_sys_error(["apt", "update", "-y"])
     _catch_sys_error(["apt-get", "install", "-y", "apt-transport-https"]) 
     _catch_sys_error(["apt", "update", "-y"])
 
@@ -479,7 +480,7 @@ def add_slurm_fix():
     _catch_sys_error(["chown", "-R", "cycle_server:cycle_server", slurm_fix_file_full_path])
     sleep(30)
 
-def import_cluster(vm_metadata):
+def import_cluster(vm_metadata, osOfClusterNodes):
     cluster_template_file_name = "slurm_template.ini"
     cluster_parameters_file_name = "slurm_params.json"
     cluster_files_download_url = "https://raw.githubusercontent.com/fayora/mydev-solution-collections/main/publish/CycleCloud_SLURM/"
@@ -503,6 +504,11 @@ def import_cluster(vm_metadata):
     subnet_string_value = resource_group + "/vnet" + vm_name + "/" + subnet_name
     subnet_param = "SubnetId=" + subnet_string_value
     print("The subnet for the worker nodes is: %s" % subnet_param)
+
+    schedulerImage_param = "SchedulerImageName=" + osOfClusterNodes
+    workerImage_param = "HPCImageName=" + osOfClusterNodes
+
+    override_params = subnet_param + " " + schedulerImage_param + " " + workerImage_param
     
     # We import the cluster, passing the subnet name as a parameter override
     _catch_sys_error(["/usr/local/bin/cyclecloud","import_cluster","-f", cluster_template_file_download_path, "-p", cluster_parameters_file_download_path, "--parameter-override", subnet_param])
@@ -621,6 +627,11 @@ def main():
                         dest="numberOfWorkerNodes",
                         default=2,
                         help="The VM size for worker nodes")
+    
+    parser.add_argument("--osOfClusterNodes",
+                        dest="osOfClusterNodes",
+                        default="Canonical:UbuntuServer:18.04-LTS:latest",
+                        help="The VM OS for both scheduler & worker nodes")
 
     args = parser.parse_args()
 
@@ -680,7 +691,7 @@ def main():
     #start_cc()
 
     # Import and start the SLURM cluster using template and parameter files downloaded from an online location 
-    import_cluster(vm_metadata)
+    import_cluster(vm_metadata, args.osOfClusterNodes)
     start_cluster()
 
 if __name__ == "__main__":
