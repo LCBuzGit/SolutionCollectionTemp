@@ -479,7 +479,7 @@ def add_slurm_fix():
     _catch_sys_error(["chown", "-R", "cycle_server:cycle_server", slurm_fix_file_full_path])
     sleep(30)
 
-def import_cluster(vm_metadata):
+def import_cluster(vm_metadata, cluster_image):
     cluster_template_file_name = "slurm_template.ini"
     cluster_parameters_file_name = "slurm_params.json"
     cluster_files_download_url = "https://raw.githubusercontent.com/fayora/mydev-solution-collections/main/publish/CycleCloud_SLURM/"
@@ -504,8 +504,16 @@ def import_cluster(vm_metadata):
     subnet_param = "SubnetId=" + subnet_string_value
     print("The subnet for the worker nodes is: %s" % subnet_param)
     
+    schedulerImage_param = "SchedulerImageName=" + cluster_image
+    print("The os image for the scheduler nodes is: %s" % schedulerImage_param)
+    
+    workerImage_param = "HPCImageName=" + cluster_image
+    print("The os image for the worker nodes is: %s" % workerImage_param)
+    
+    override_params = subnet_param + " " + schedulerImage_param + " " + workerImage_param
+    
     # We import the cluster, passing the subnet name as a parameter override
-    _catch_sys_error(["/usr/local/bin/cyclecloud","import_cluster","-f", cluster_template_file_download_path, "-p", cluster_parameters_file_download_path, "--parameter-override", subnet_param])
+    _catch_sys_error(["/usr/local/bin/cyclecloud","import_cluster","-f", cluster_template_file_download_path, "-p", cluster_parameters_file_download_path, "--parameter-override", override_params])
 
 
 def start_cluster():
@@ -685,7 +693,7 @@ def main():
     #start_cc()
 
     # Import and start the SLURM cluster using template and parameter files downloaded from an online location 
-    import_cluster(vm_metadata)
+    import_cluster(vm_metadata, osOfClusterNodes)
     start_cluster()
 
 if __name__ == "__main__":
