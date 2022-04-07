@@ -620,6 +620,11 @@ def main():
                         dest="numberOfWorkerNodes",
                         default=2,
                         help="The VM size for worker nodes")
+    
+    parser.add_argument("--osOfClusterNodes",
+                        dest="osOfClusterNodes",
+                        default="Canonical:UbuntuServer:18.04-LTS:latest",
+                        help="The VM OS for both scheduler & worker nodes")
 
     args = parser.parse_args()
 
