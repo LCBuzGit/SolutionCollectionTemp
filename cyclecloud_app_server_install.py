@@ -693,7 +693,7 @@ def main():
     #start_cc()
 
     # Import and start the SLURM cluster using template and parameter files downloaded from an online location 
-    import_cluster(vm_metadata, osOfClusterNodes)
+    import_cluster(vm_metadata, args.osOfClusterNodes)
     start_cluster()
 
 if __name__ == "__main__":
