@@ -505,7 +505,7 @@ def import_cluster(vm_metadata, cluster_image, machine_type, node_size, node_cor
     print("The machine type for the worker nodes is: %s" % machineType_param)
 
     max_core = int(node_size) * int(node_cores)
-    maxCore_param = "HPCMaxScalesetSize=" + str(max_core)
+    maxCore_param = "MaxHPCExecuteCoreCount=" + str(max_core)
     print("The amount of execute core for the worker nodes is: %s" % maxCore_param)
     
     # We import the cluster, passing the subnet name as a parameter override
