@@ -470,7 +470,7 @@ def add_slurm_fix():
     _catch_sys_error(["chown", "-R", "cycle_server:cycle_server", slurm_fix_file_full_path])
     sleep(30)
 
-def import_cluster(vm_metadata, cluster_image, machine_type, max_core):
+def import_cluster(vm_metadata, cluster_image, machine_type, node_size, node_cores):
     cluster_template_file_name = "slurm_template.ini"
     cluster_parameters_file_name = "slurm_params.json"
     cluster_files_download_url = "https://raw.githubusercontent.com/fayora/mydev-solution-collections/main/publish/CycleCloud_SLURM/"
@@ -504,6 +504,7 @@ def import_cluster(vm_metadata, cluster_image, machine_type, max_core):
     machineType_param = "HPCMachineType=" + machine_type
     print("The machine type for the worker nodes is: %s" % machineType_param)
 
+    max_core = node_size * node_cores
     maxCore_param = "HPCMaxScalesetSize=" + max_core
     print("The amount of execute core for the worker nodes is: %s" % maxCore_param)
     
@@ -620,15 +621,21 @@ def main():
                         default="Standard_B2ms",
                         help="The VM size for worker nodes")
 
-    parser.add_argument("--numberOfmaxCore",
-                        dest="numberOfmaxCore",
-                        default=10,
-                        help="The max amount of cores for workder nodes")
+    parser.add_argument("--numberOfWorkerNodes",
+                        dest="numberOfWorkerNodes",
+                        default=2,
+                        help="The VM size for worker nodes")
     
     parser.add_argument("--osOfClusterNodes",
                         dest="osOfClusterNodes",
                         default="Canonical:UbuntuServer:18.04-LTS:latest",
                         help="The VM OS for both scheduler & worker nodes")
+
+    parser.add_argument("--countOfNodeCores",
+                        dest="countOfNodeCores",
+                        default=2,
+                        help="The amount of cores for worker nodes")
+
 
     args = parser.parse_args()
 
@@ -688,7 +695,7 @@ def main():
     #start_cc()
 
     # Import and start the SLURM cluster using template and parameter files downloaded from an online location 
-    import_cluster(vm_metadata, args.osOfClusterNodes, args.sizeOfWorkerNodes, args.numberOfmaxCore)
+    import_cluster(vm_metadata, args.osOfClusterNodes, args.sizeOfWorkerNodes, args.numberOfWorkerNodes, args.countOfNodeCores)
     start_cluster()
 
 if __name__ == "__main__":
