@@ -51,15 +51,24 @@ def create_keypair(username, public_key=None):
         _catch_sys_error(["mkdir", "-p", "/home/{}/.ssh".format(username)])
     public_key_file  = "/home/{}/.ssh/id_rsa.pub".format(username)
     if not os.path.exists(public_key_file):
-        _catch_sys_error(["ssh-keygen", "-f", "/home/{}/.ssh/id_rsa".format(username), "-N", ""])
-        with open(public_key_file, 'r') as pubkeyfile:
-            public_key = pubkeyfile.read()
+        if public_key:
+            with open(public_key_file, 'w') as pubkeyfile:
+                pubkeyfile.write(public_key)
+                pubkeyfile.write("\n")
+        else:
+            _catch_sys_error(["ssh-keygen", "-f", "/home/{}/.ssh/id_rsa".format(username), "-N", ""])
+            with open(public_key_file, 'r') as pubkeyfile:
+                public_key = pubkeyfile.read()
 
     authorized_key_file = "/home/{}/.ssh/authorized_keys".format(username)
     authorized_keys = ""
     if os.path.exists(authorized_key_file):
         with open(authorized_key_file, 'r') as authkeyfile:
             authorized_keys = authkeyfile.read()
+    if public_key not in authorized_keys:
+        with open(authorized_key_file, 'w') as authkeyfile:
+            authkeyfile.write(public_key)
+            authkeyfile.write("\n")
     _catch_sys_error(["chown", "-R", username + ":" + username, "/home/{}".format(username)])
     return public_key
 
