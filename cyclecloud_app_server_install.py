@@ -504,7 +504,7 @@ def import_cluster(vm_metadata, cluster_image, machine_type, node_size, node_cor
     machineType_param = "HPCMachineType=" + machine_type
     print("The machine type for the worker nodes is: %s" % machineType_param)
 
-    max_core = node_size * node_cores
+    max_core = int(node_size) * int(node_cores)
     maxCore_param = "HPCMaxScalesetSize=" + max_core
     print("The amount of execute core for the worker nodes is: %s" % maxCore_param)
     
