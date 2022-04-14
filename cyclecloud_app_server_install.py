@@ -51,24 +51,15 @@ def create_keypair(username, public_key=None):
         _catch_sys_error(["mkdir", "-p", "/home/{}/.ssh".format(username)])
     public_key_file  = "/home/{}/.ssh/id_rsa.pub".format(username)
     if not os.path.exists(public_key_file):
-        if public_key:
-            with open(public_key_file, 'w') as pubkeyfile:
-                pubkeyfile.write(public_key)
-                pubkeyfile.write("\n")
-        else:
-            _catch_sys_error(["ssh-keygen", "-f", "/home/{}/.ssh/id_rsa".format(username), "-N", ""])
-            with open(public_key_file, 'r') as pubkeyfile:
-                public_key = pubkeyfile.read()
+        _catch_sys_error(["ssh-keygen", "-f", "/home/{}/.ssh/id_rsa".format(username), "-N", ""])
+        with open(public_key_file, 'r') as pubkeyfile:
+            public_key = pubkeyfile.read()
 
     authorized_key_file = "/home/{}/.ssh/authorized_keys".format(username)
     authorized_keys = ""
     if os.path.exists(authorized_key_file):
         with open(authorized_key_file, 'r') as authkeyfile:
             authorized_keys = authkeyfile.read()
-    if public_key not in authorized_keys:
-        with open(authorized_key_file, 'w') as authkeyfile:
-            authkeyfile.write(public_key)
-            authkeyfile.write("\n")
     _catch_sys_error(["chown", "-R", username + ":" + username, "/home/{}".format(username)])
     return public_key
 
@@ -479,7 +470,7 @@ def add_slurm_fix():
     _catch_sys_error(["chown", "-R", "cycle_server:cycle_server", slurm_fix_file_full_path])
     sleep(30)
 
-def import_cluster(vm_metadata, cluster_image):
+def import_cluster(vm_metadata, cluster_image, machine_type, max_core):
     cluster_template_file_name = "slurm_template.ini"
     cluster_parameters_file_name = "slurm_params.json"
     cluster_files_download_url = "https://raw.githubusercontent.com/fayora/mydev-solution-collections/main/publish/CycleCloud_SLURM/"
@@ -509,9 +500,15 @@ def import_cluster(vm_metadata, cluster_image):
     
     workerImage_param = "HPCImageName=" + cluster_image
     print("The os image for the worker nodes is: %s" % workerImage_param)
+
+    machineType_param = "HPCMachineType=" + machine_type
+    print("The machine type for the worker nodes is: %s" % machineType_param)
+
+    maxCore_param = "HPCMaxScalesetSize=" + max_core
+    print("The amount of execute core for the worker nodes is: %s" % maxCore_param)
     
     # We import the cluster, passing the subnet name as a parameter override
-    _catch_sys_error(["/usr/local/bin/cyclecloud","import_cluster","-f", cluster_template_file_download_path, "-p", cluster_parameters_file_download_path, "--parameter-override", subnet_param, "--parameter-override", schedulerImage_param, "--parameter-override", workerImage_param])
+    _catch_sys_error(["/usr/local/bin/cyclecloud","import_cluster","-f", cluster_template_file_download_path, "-p", cluster_parameters_file_download_path, "--parameter-override", subnet_param, "--parameter-override", schedulerImage_param, "--parameter-override", workerImage_param, "--parameter-override", machineType_param, "--parameter-override", maxCore_param])
 
 
 def start_cluster():
@@ -623,10 +620,10 @@ def main():
                         default="Standard_B2ms",
                         help="The VM size for worker nodes")
 
-    parser.add_argument("--numberOfWorkerNodes",
-                        dest="numberOfWorkerNodes",
-                        default=2,
-                        help="The VM size for worker nodes")
+    parser.add_argument("--numberOfmaxCore",
+                        dest="numberOfmaxCore",
+                        default=10,
+                        help="The max amount of cores for workder nodes")
     
     parser.add_argument("--osOfClusterNodes",
                         dest="osOfClusterNodes",
@@ -691,7 +688,7 @@ def main():
     #start_cc()
 
     # Import and start the SLURM cluster using template and parameter files downloaded from an online location 
-    import_cluster(vm_metadata, args.osOfClusterNodes)
+    import_cluster(vm_metadata, args.osOfClusterNodes, args.sizeOfWorkerNodes, args.numberOfmaxCore)
     start_cluster()
 
 if __name__ == "__main__":
