@@ -423,10 +423,7 @@ def already_installed():
 
 def download_install_cc():
     print("Installing Azure CycleCloud server")
-    # Versions listed here: https://packages.microsoft.com/repos/cyclecloud/pool/main/c/cyclecloud8/ 
-    cycle_cloud_version = "8.2.1-1733"
-    cycle_cloud_apt_package = "cyclecloud8=" + cycle_cloud_version
-    _catch_sys_error(["apt", "install", "-y", cycle_cloud_apt_package])
+    _catch_sys_error(["apt", "install", "-y", "cyclecloud8"])
 
 def configure_msft_apt_repos():
     print("Configuring Microsoft apt repository for CycleCloud install")
