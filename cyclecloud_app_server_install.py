@@ -444,9 +444,9 @@ def configure_msft_apt_repos():
 
     with open('/etc/apt/sources.list.d/cyclecloud.list', 'w') as f:
         f.write("deb [arch=amd64] https://packages.microsoft.com/repos/cyclecloud {} main".format(lsb_release))
-    #_catch_sys_error(["apt", "update", "-y"])
-    _catch_sys_error(["apt-get", "install", "-y", "apt-transport-https"]) 
     _catch_sys_error(["apt", "update", "-y"])
+    _catch_sys_error(["apt-get", "install", "-y", "apt-transport-https"]) 
+    #_catch_sys_error(["apt", "update", "-y"])
 
 def install_pre_req():
     print("Installing pre-requisites for CycleCloud server")
