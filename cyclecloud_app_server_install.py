@@ -423,7 +423,10 @@ def already_installed():
 
 def download_install_cc():
     print("Installing Azure CycleCloud server")
-    _catch_sys_error(["apt", "install", "-y", "cyclecloud8"])
+    # Versions listed here: https://packages.microsoft.com/repos/cyclecloud/pool/main/c/cyclecloud8/ 
+    cycle_cloud_version = "8.2.2-1902"
+    cycle_cloud_apt_package = "cyclecloud8=" + cycle_cloud_version
+    _catch_sys_error(["apt", "install", "-y", cycle_cloud_apt_package])
 
 def configure_msft_apt_repos():
     print("Configuring Microsoft apt repository for CycleCloud install")
@@ -457,6 +460,7 @@ def install_pre_req():
     # Not strictly needed, but it's useful to have the AZ CLI
     _catch_sys_error(["apt", "install", "-y", "azure-cli"])
 
+'''
 def add_slurm_fix():
     # Download the file with the Slurm fix, save it in the required path and give the cycle_server ownership of it
     slurm_fix_file_name = "cluster-init-slurm-2.5.1.txt"
@@ -469,6 +473,7 @@ def add_slurm_fix():
     _catch_sys_error(["mv", slurm_fix_file_download_path, slurm_fix_file_path])
     _catch_sys_error(["chown", "-R", "cycle_server:cycle_server", slurm_fix_file_full_path])
     sleep(30)
+'''
 
 def import_cluster(vm_metadata, cluster_image, machine_type, node_size, node_cores):
     cluster_template_file_name = "slurm_template.ini"
@@ -691,7 +696,7 @@ def main():
     #clean_up()
 
     # Add the temporary fix provided by the CycleCloud Engineerig team for SLURM, and then restart the CycleCloud server
-    add_slurm_fix()
+    #add_slurm_fix()
     #start_cc()
 
     # Import and start the SLURM cluster using template and parameter files downloaded from an online location 
