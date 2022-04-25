@@ -695,7 +695,8 @@ def main():
 
     #  Create user requires root privileges
     ssh_key = create_keypair(args.useManagedIdentity, vm_metadata, args.sshkey)
-    create_user_credential(args.username, ssh_key)
+    public_key = ssh_key["publicKey"]
+    create_user_credential(args.username, public_key)
 
     # Sleep for 5 minutes while CycleCloud retrieves Azure information and finish its internal configuration
     sleep(300)
