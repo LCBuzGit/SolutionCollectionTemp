@@ -63,7 +63,7 @@ def create_keypair(username, public_key=None):
     _catch_sys_error(["chown", "-R", username + ":" + username, "/home/{}".format(username)])
     return public_key
 '''
-def create_keypair(use_managed_identity, vm_metadata, ssh_key):
+def create_keypair(use_managed_identity, vm_metadata, sshkey):
     if use_managed_identity:
         managed_identify = get_vm_managed_identity()
         access_token = managed_identify["access_token"]
@@ -74,7 +74,7 @@ def create_keypair(use_managed_identity, vm_metadata, ssh_key):
     subscriptionId = vm_metadata["compute"]["subscriptionId"]
     resourceGroup = vm_metadata["compute"]["resourceGroupName"]
     
-    sshkey_url = "https://management.azure.com/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Compute/sshPublicKeys/{}/generateKeyPair?api-version=2021-11-01".format(subscriptionId, resourceGroup, ssh_key)
+    sshkey_url = "https://management.azure.com/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Compute/sshPublicKeys/{}/generateKeyPair?api-version=2021-11-01".format(subscriptionId, resourceGroup, sshkey)
     sshkey_req = Request(sshkey_url, method="POST", headers=access_headers)
 
     for _ in range(30):
