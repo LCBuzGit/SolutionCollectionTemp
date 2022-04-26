@@ -46,37 +46,26 @@ def create_user(username):
         _catch_sys_error(["useradd", "-m", "-d", "/home/{}".format(username), username])
     _catch_sys_error(["chown", "-R", username + ":" + username, "/home/{}".format(username)])
 
-def create_keypair(use_managed_identity, vm_metadata, ssh_key):
-    if use_managed_identity:
-        managed_identify = get_vm_managed_identity()
-        access_token = managed_identify["access_token"]
-        access_headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
+def create_keypair(username, public_key=None):
+    if not os.path.isdir("/home/{}/.ssh".format(username)):
+        _catch_sys_error(["mkdir", "-p", "/home/{}/.ssh".format(username)])
+    public_key_file  = "/home/{}/.ssh/id_rsa.pub".format(username)
+    if not os.path.exists(public_key_file):
+        _catch_sys_error(["ssh-keygen", "-f", "/home/{}/.ssh/id_rsa".format(username), "-N", ""])
+        with open(public_key_file, 'r') as pubkeyfile:
+            public_key = pubkeyfile.read()
 
-    subscriptionId = vm_metadata["compute"]["subscriptionId"]
-    resourceGroup = vm_metadata["compute"]["resourceGroupName"]
-    
-    sshkey_url = "https://management.azure.com/subscriptions/{}}/resourceGroups/{}}/providers/Microsoft.Compute/sshPublicKeys/{}/generateKeyPair?api-version=2021-11-01".format(subscriptionId, resourceGroup, ssh_key)
-    sshkey_req = Request(sshkey_url, method="POST", headers=access_headers)
+    authorized_key_file = "/home/{}/.ssh/authorized_keys".format(username)
+    authorized_keys = ""
+    if os.path.exists(authorized_key_file):
+        with open(authorized_key_file, 'r') as authkeyfile:
+            authorized_keys = authkeyfile.read()
+    _catch_sys_error(["chown", "-R", username + ":" + username, "/home/{}".format(username)])
+    return public_key
 
-    for _ in range(30):
-        print("Generating SSH key")
-        sshkey_response = urlopen(sshkey_req, timeout=2)
-        
-        try:
-            return json.load(sshkey_response)
-        except ValueError as e:
-            print("Failed to generate SSH key %s" % e)
-            print("    Retrying")
-            sleep(2)
-            continue
-        except:
-            print("Unable to generate SSH key after 30 tries")
-            raise
-
-def create_user_credential(username, public_key):
-    create_user(username)
+def create_user_credential(username, public_key=None):
+    create_user(username)    
+    public_key = create_keypair(username, public_key)
 
     credential_record = {
         "PublicKey": public_key,
@@ -584,10 +573,10 @@ def main():
                         default="",
                         help="The password for the CycleCloud UI user")
 
-    parser.add_argument("--sshkey",
-                        dest="sshkey",
+    parser.add_argument("--publickey",
+                        dest="publickey",
                         default="",
-                        help="The Azure ssh key instance that stores the public ssh key for remote accessing scheduler node")
+                        help="The public ssh key for the CycleCloud UI user")
 
     parser.add_argument("--storageAccount",
                         dest="storageAccount",
@@ -671,14 +660,14 @@ def main():
 
     # We decode the password and publick key back to an ASCII string because they are passed as Base64 to avoid issues with special characters
     decoded_password = base64.b64decode(args.password).decode('ascii')
-    #decoded_publicKey = base64.b64decode(args.publickey).decode('ascii')
+    decoded_publicKey = base64.b64decode(args.publickey).decode('ascii')
 
     print("The raw password is: %s" % args.password)
     print("The decoded password is: %s" % decoded_password)
 
 
-    #print("The raw SSH key is: %s" %  args.publickey)
-    #print("The decoded SSH key is: %s" % decoded_publicKey)
+    print("The raw SSH key is: %s" %  args.publickey)
+    print("The decoded SSH key is: %s" % decoded_publicKey)
 
     if args.resourceGroup:
         print("CycleCloud created in resource group: %s" % vm_metadata["compute"]["resourceGroupName"])
@@ -694,9 +683,7 @@ def main():
         letsEncrypt(args.hostname)
 
     #  Create user requires root privileges
-    ssh_key = create_keypair(args.useManagedIdentity, vm_metadata, args.sshkey)
-    public_key = ssh_key["publicKey"]
-    create_user_credential(args.username, public_key)
+    create_user_credential(args.username, decoded_publicKey)
 
     # Sleep for 5 minutes while CycleCloud retrieves Azure information and finish its internal configuration
     sleep(300)
