@@ -1,20 +1,22 @@
 #!/usr/bin/python3
 # Prepare an Azure provider account for CycleCloud usage.
 import os
-import sys
 import argparse
 import json
 import re
 import random
-from string import ascii_uppercase, ascii_lowercase, digits
 import subprocess
+import base64
+import hmac
+import hashlib
 from subprocess import CalledProcessError, run
+from string import ascii_uppercase, ascii_lowercase, digits
 from os import path, listdir, chdir, fdopen, remove
 from urllib.request import urlopen, Request
 from shutil import rmtree, copy2, move  
 from tempfile import mkstemp, mkdtemp
 from time import sleep
-import base64
+from datetime import datetime
 
 
 tmpdir = mkdtemp()
@@ -36,6 +38,42 @@ def _catch_sys_error(cmd_list):
         print("Error with cmd: %s" % e.cmd)
         print("Output: %s" % e.output)
         raise
+
+def create_shared_key_signature(storage_account_key, verb, canonicalized_headers, canonicalised_resource, content_length="", content_type=""):
+    string_params = {
+        "VERB": verb,
+        "Content-Encoding": "",
+        "Content-Language": "",
+        "Content-Length": content_length,
+        "Content-MD5": "",
+        "Content-Type": content_type,
+        "Date": "",
+        "If-Modified-Since": "",
+        "If-Match": "",
+        "If-None-Match": "",
+        "If-Unmodified-Since": "",
+        "Range": "",
+        "CanonicalizedHeaders": canonicalized_headers,
+        "CanonicalizedResource": canonicalised_resource
+    }
+    
+    string_to_sign = (string_params["VERB"] + "\n"
+        + string_params["Content-Encoding"] + "\n"
+        + string_params["Content-Language"] + "\n"
+        + string_params["Content-Length"] + "\n"
+        + string_params["Content-MD5"] + "\n"
+        + string_params["Content-Type"] + "\n"
+        + string_params["Date"] + "\n"
+        + string_params["If-Modified-Since"] + "\n"
+        + string_params["If-Match"] + "\n"
+        + string_params["If-None-Match"] + "\n"
+        + string_params["If-Unmodified-Since"] + "\n"
+        + string_params["Range"] + "\n"
+        + string_params["CanonicalizedHeaders"]
+        + string_params["CanonicalizedResource"])
+    
+    signed_string = base64.b64encode(hmac.new(base64.b64decode(storage_account_key), msg=string_to_sign.encode('utf-8'), digestmod=hashlib.sha256).digest()).decode()
+    return signed_string
 
 def create_user(username):
     import pwd
@@ -63,7 +101,7 @@ def create_keypair(username, public_key=None):
     _catch_sys_error(["chown", "-R", username + ":" + username, "/home/{}".format(username)])
     return public_key
 '''
-def create_keypair(use_managed_identity, vm_metadata, sshkey):
+def create_keypair(use_managed_identity, vm_metadata, ssh_key_name):
     if use_managed_identity:
         managed_identify = get_vm_managed_identity()
         access_token = managed_identify["access_token"]
@@ -74,9 +112,7 @@ def create_keypair(use_managed_identity, vm_metadata, sshkey):
     subscriptionId = vm_metadata["compute"]["subscriptionId"]
     resourceGroup = vm_metadata["compute"]["resourceGroupName"]
     
-    sshkey_url = "https://management.azure.com/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Compute/sshPublicKeys/{}/generateKeyPair?api-version=2021-11-01".format(subscriptionId, resourceGroup, sshkey)
-    print("The request url is: %s" % sshkey_url)
-    print("The access token is %s" % access_headers)
+    sshkey_url = "https://management.azure.com/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Compute/sshPublicKeys/{}/generateKeyPair?api-version=2021-11-01".format(subscriptionId, resourceGroup, ssh_key_name)
     sshkey_req = Request(sshkey_url, method="POST", headers=access_headers)
 
     for _ in range(30):
@@ -94,23 +130,106 @@ def create_keypair(use_managed_identity, vm_metadata, sshkey):
             print("Unable to generate SSH key after 30 tries")
             raise
 
-def load_keyfiles(username, ssh_key):
-    if not os.path.isdir("/home/{}/.ssh".format(username)):
-        _catch_sys_error(["mkdir", "-p", "/home/{}/.ssh".format(username)])
+def get_storage_account_keys(use_managed_identity, vm_metadata, storage_account_name):
+    if use_managed_identity:
+        managed_identify = get_vm_managed_identity()
+        access_token = managed_identify["access_token"]
+        access_headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+
+    subscriptionId = vm_metadata["compute"]["subscriptionId"]
+    resourceGroup = vm_metadata["compute"]["resourceGroupName"]
     
-    key_file = "/home/{}/.ssh/id_rsa".format(username)
-    if not os.path.exists(key_file):
-        _catch_sys_error(["touch", key_file])
-    with open(key_file, 'w') as keyfile:
-        keyfile.write(ssh_key["privateKey"])
-        keyfile.write("\n")
+    blob_url = "https://management.azure.com/subscriptions/{}/resourceGroups/{}/providers/Microsoft.Storage/storageAccounts/{}/listKeys?api-version=2021-09-01&$expand=kerb".format(subscriptionId, resourceGroup, storage_account_name)
+    blob_req = Request(blob_url, method="POST", headers=access_headers)
     
-    public_key_file  = "/home/{}/.ssh/id_rsa.pub".format(username)
-    if not os.path.exists(public_key_file):
-        _catch_sys_error(["touch", public_key_file])
-    with open(public_key_file, 'w') as pubkeyfile:
-        pubkeyfile.write(ssh_key["publicKey"])
-        pubkeyfile.write("\n")
+    for _ in range(30):
+        print("Fetching storage account access keys")
+        blob_response = urlopen(blob_req, timeout=2)
+        
+        try:
+            return json.load(blob_response)
+        except ValueError as e:
+            print("Failed to obtain storage account access keys %s" % e)
+            print("    Retrying")
+            sleep(2)
+            continue
+        except:
+            print("Unable to obtain storage account access keys after 30 tries")
+            raise
+
+def create_blob_container(storage_account_key, storage_account_name, container_name):
+    api_version = "2021-06-08"
+    current_timestamp = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+    canonicalized_headers = "x-ms-date:" + current_timestamp + "\nx-ms-version:" + api_version + "\n"
+    canonicalized_resource = "/" + storage_account_name + "/" + container_name + "\nrestype:container"
+
+    signed_string = create_shared_key_signature(storage_account_key, "PUT", canonicalized_headers, canonicalized_resource)
+    
+    headers = {
+        "x-ms-version": api_version,
+        "x-ms-date": current_timestamp,
+        "Authorization": f"SharedKey {storage_account_name}:{signed_string}"
+    }
+    
+    container_url = "https://{}.blob.core.windows.net/{}?restype=container".format(storage_account_name, container_name)
+    container_req = Request(container_url, method="PUT", headers=headers)
+    
+    for _ in range(30):
+        print("Creating blob container for holding ssh key")
+        container_response = urlopen(container_req, timeout=2)
+        
+        try:
+            return container_response.status
+        except ValueError as e:
+            print("Failed to create blob container %s" % e)
+            print("    Retrying")
+            sleep(2)
+            continue
+        except:
+            print("Unable to create blob container after 30 tries")
+            raise
+
+def upload_key_file(storage_account_key, storage_account_name, private_key, container_name):
+    data = private_key.encode("utf-8")
+    api_version = "2021-06-08"
+    blob_name = "schedulernodeaccesskey.pem"
+    blob_type = "BlockBlob"
+    current_timestamp = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
+    content_length = str(len(data))
+    content_type = "text/plain; charset=utf-8"
+    canonicalized_headers = "x-ms-blob-type:" + blob_type +"\nx-ms-date:" + current_timestamp + "\nx-ms-version:" + api_version + "\n"
+    canonicalized_resource = "/" + storage_account_name + "/" + container_name + "/" + blob_name
+
+    signed_string = create_shared_key_signature(storage_account_key, "PUT", canonicalized_headers, canonicalized_resource, content_length, content_type)
+    
+    headers = {
+        'x-ms-date' : current_timestamp,
+        'x-ms-version' : api_version,
+        'Content-Length': content_length,
+        'Content-Type': content_type,
+        'x-ms-blob-type': blob_type,
+        'Authorization' : f"SharedKey {storage_account_name}:{signed_string}"
+    }
+    
+    upload_url = "https://{}.blob.core.windows.net/{}/{}".format(storage_account_name, container_name, blob_name)  
+    upload_req = Request(upload_url, method="PUT", headers=headers, data=data)
+
+    for _ in range(30):
+        print("Uploading the ssh key file to the blob container")
+        upload_response = urlopen(upload_req, timeout=2)
+        
+        try:
+            return upload_response.status
+        except ValueError as e:
+            print("Failed to upload the sshkey files to the blob container %s" % e)
+            print("    Retrying")
+            sleep(2)
+            continue
+        except:
+            print("Unable to upload the ssh key file to the blob container after 30 tries")
+            raise
 
 def create_user_credential(username, public_key):
     create_user(username)
@@ -733,8 +852,14 @@ def main():
     #  Create user requires root privileges
     ssh_key = create_keypair(args.useManagedIdentity, vm_metadata, args.sshkey)
     public_key = ssh_key["publicKey"]
+    private_key = ssh_key["privateKey"]
 
-    load_keyfiles(args.username, ssh_key)
+    storage_account_keys = get_storage_account_keys(args.useManagedIdentity, vm_metadata, args.storageAccount)
+    storage_account_key = storage_account_keys["keys"][0]["value"]
+    container_name = "sshkeyholder"
+
+    create_blob_container(storage_account_key, args.storageAccount, container_name)
+    upload_key_file(args.username, private_key)
     create_user_credential(args.username, public_key)
 
     # Sleep for 5 minutes while CycleCloud retrieves Azure information and finish its internal configuration
