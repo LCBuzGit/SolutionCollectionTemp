@@ -859,7 +859,7 @@ def main():
     container_name = "sshkeyholder"
 
     create_blob_container(storage_account_key, args.storageAccount, container_name)
-    upload_key_file(args.username, private_key)
+    upload_key_file(storage_account_key, args.storageAccount, private_key, container_name)
     create_user_credential(args.username, public_key)
 
     # Sleep for 5 minutes while CycleCloud retrieves Azure information and finish its internal configuration
