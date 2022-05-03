@@ -192,13 +192,13 @@ def create_blob_container(storage_account_key, storage_account_name, container_n
             raise
 
 def upload_key_file(storage_account_key, storage_account_name, private_key, container_name):
-    data = private_key.encode("us-ascii")
+    data = private_key.encode("utf-8")
     api_version = "2021-06-08"
     blob_name = "schedulernodeaccesskey.pem"
     blob_type = "BlockBlob"
     current_timestamp = datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
     content_length = str(len(data))
-    content_type = "text/plain; charset=us-ascii"
+    content_type = "text/plain; charset=utf-8"
     canonicalized_headers = "x-ms-blob-type:" + blob_type +"\nx-ms-date:" + current_timestamp + "\nx-ms-version:" + api_version + "\n"
     canonicalized_resource = "/" + storage_account_name + "/" + container_name + "/" + blob_name
 
